@@ -1,0 +1,18 @@
+[build-system]
+requires = ["setuptools>=61.0"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "velma-dictate"
+version = "0.1.0"
+description = "System-wide Wayland dictation client using local Whisper API on MLBox"
+authors = [{ name = "Yalt" }]
+readme = "README.md"
+requires-python = ">=3.10"
+dependencies = [
+    "requests",
+    "evdev"
+]
+
+[project.scripts]
+velma-dictate = "velma_dictate.cli:main"
