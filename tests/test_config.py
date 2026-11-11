@@ -11,7 +11,7 @@ def test_dictate_config_defaults():
     assert cfg.model == "parakeet"
     assert "8001" in cfg.endpoint_url
     assert cfg.sample_rate == 16000
-    assert cfg.vad_silence_seconds == 0.6
+    assert cfg.trigger_key == "KEY_RIGHTCTRL"
 
 def test_load_auth_token_success():
     with tempfile.NamedTemporaryFile("w+", delete=False) as tf:

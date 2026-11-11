@@ -1,8 +1,8 @@
-import os
 import subprocess
+import threading
 import time
-from typing import Dict, Tuple, Optional
-import evdev
+from typing import Dict, Optional, Tuple
+
 from evdev import ecodes, UInput
 
 # Mapping standard ASCII characters to (evdev_keycode, shift_needed)
@@ -46,79 +46,79 @@ ASCII_TO_KEY: Dict[str, Tuple[int, bool]] = {
     '`': (ecodes.KEY_GRAVE, False), '~': (ecodes.KEY_GRAVE, True),
 }
 
+VIRTUAL_KEYBOARD_NAME = "velma-dictate-keyboard"
+
+# Typographic characters the model may emit, mapped to typeable ASCII.
+ASCII_SUBSTITUTES = {
+    "\u2018": "'", "\u2019": "'", "\u201c": '"', "\u201d": '"',
+    "\u2013": "-", "\u2014": "-", "\u2026": "...", "\u00a0": " ",
+}
+
 ALL_CAP_KEYS = set(k for k, _ in ASCII_TO_KEY.values()) | {
     ecodes.KEY_LEFTSHIFT, ecodes.KEY_LEFTCTRL, ecodes.KEY_V, ecodes.KEY_INSERT
 }
 
 class WaylandTyper:
-    def __init__(self):
-        self.ui: Optional[UInput] = None
-        self._init_uinput()
+    """Types text into the focused window through one virtual keyboard.
 
-    def _init_uinput(self) -> None:
+    The uinput device is created once and kept, so the compositor has
+    already seen it by the time the first clip is typed.
+    """
+
+    def __init__(self, key_delay: float = 0.004):
+        self.key_delay = key_delay
+        self.ui: Optional[UInput] = None
         try:
-            cap = {ecodes.EV_KEY: list(ALL_CAP_KEYS)}
-            self.ui = UInput(cap, name="velma-dictate-keyboard")
-        except Exception as e:
-            # If UInput cannot be opened, we fall back to clipboard-only methods
+            self.ui = UInput({ecodes.EV_KEY: list(ALL_CAP_KEYS)}, name=VIRTUAL_KEYBOARD_NAME)
+        except Exception:
             self.ui = None
 
-    def type_char(self, keycode: int, shift: bool) -> None:
+    def _tap(self, keycode: int, shift: bool) -> None:
+        ui = self.ui
+        if shift:
+            ui.write(ecodes.EV_KEY, ecodes.KEY_LEFTSHIFT, 1)
+            ui.syn()
+        ui.write(ecodes.EV_KEY, keycode, 1)
+        ui.syn()
+        time.sleep(self.key_delay)
+        ui.write(ecodes.EV_KEY, keycode, 0)
+        ui.syn()
+        if shift:
+            ui.write(ecodes.EV_KEY, ecodes.KEY_LEFTSHIFT, 0)
+            ui.syn()
+        time.sleep(self.key_delay)
+
+    def _paste(self, text: str) -> None:
+        """Clipboard + Ctrl+V, used only for text that has non-ASCII characters."""
+        subprocess.run(["wl-copy", "--", text], check=True, timeout=2.0)
         if not self.ui:
             return
-        if shift:
-            self.ui.write(ecodes.EV_KEY, ecodes.KEY_LEFTSHIFT, 1)
+        time.sleep(0.05)
+        for code, val in ((ecodes.KEY_LEFTCTRL, 1), (ecodes.KEY_V, 1),
+                          (ecodes.KEY_V, 0), (ecodes.KEY_LEFTCTRL, 0)):
+            self.ui.write(ecodes.EV_KEY, code, val)
             self.ui.syn()
-        self.ui.write(ecodes.EV_KEY, keycode, 1)
-        self.ui.syn()
-        time.sleep(0.003)
-        self.ui.write(ecodes.EV_KEY, keycode, 0)
-        self.ui.syn()
-        if shift:
-            self.ui.write(ecodes.EV_KEY, ecodes.KEY_LEFTSHIFT, 0)
-            self.ui.syn()
-        time.sleep(0.003)
+            time.sleep(self.key_delay)
 
-    def paste_via_clipboard(self, text: str) -> bool:
-        """Copies text to Wayland clipboard using wl-copy and sends Ctrl+V."""
-        try:
-            subprocess.run(["wl-copy", text], check=True, timeout=2.0)
-            if self.ui:
-                # Send Ctrl+V
-                self.ui.write(ecodes.EV_KEY, ecodes.KEY_LEFTCTRL, 1)
-                self.ui.syn()
-                self.ui.write(ecodes.EV_KEY, ecodes.KEY_V, 1)
-                self.ui.syn()
-                time.sleep(0.01)
-                self.ui.write(ecodes.EV_KEY, ecodes.KEY_V, 0)
-                self.ui.syn()
-                self.ui.write(ecodes.EV_KEY, ecodes.KEY_LEFTCTRL, 0)
-                self.ui.syn()
-                return True
-        except Exception:
-            pass
-        return False
+    @staticmethod
+    def prepare(text: str, append_space: bool = True) -> str:
+        out = "".join(ASCII_SUBSTITUTES.get(ch, ch) for ch in text)
+        if append_space and out and not out.endswith(" "):
+            out += " "
+        return out
 
-    def type_text(self, text: str, append_space: bool = True) -> None:
-        """
-        Types the text directly into the focused window.
-        Uses character typing for standard ASCII, or clipboard paste fallback if needed.
-        """
-        if not text:
+    def type_text(self, text: str, cancel: Optional[threading.Event] = None,
+                  append_space: bool = True) -> None:
+        out = self.prepare(text, append_space)
+        if not out:
             return
-
-        out_text = text + (" " if append_space and not text.endswith(" ") else "")
-
-        # Check if all characters can be typed directly
-        can_type_all = self.ui is not None and all(ch in ASCII_TO_KEY for ch in out_text)
-
-        if can_type_all and self.ui:
-            for ch in out_text:
-                keycode, shift = ASCII_TO_KEY[ch]
-                self.type_char(keycode, shift)
+        if self.ui and all(ch in ASCII_TO_KEY for ch in out):
+            for ch in out:
+                if cancel is not None and cancel.is_set():
+                    return
+                self._tap(*ASCII_TO_KEY[ch])
         else:
-            # Use clipboard paste for unicode/special characters or if typing is unavailable
-            self.paste_via_clipboard(out_text)
+            self._paste(out)
 
     def close(self) -> None:
         if self.ui:

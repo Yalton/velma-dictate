@@ -1,77 +1,42 @@
 import argparse
+import subprocess
 import sys
 from pathlib import Path
 
 from .client import WhisperClient
 from .config import DictateConfig, load_auth_token
-from .daemon import DictationDaemon, is_running, stop_running_session
+
 
 def main() -> None:
-    parser = argparse.ArgumentParser(description="Velma System-Wide Wayland Dictation")
-    parser.add_argument(
-        "action",
-        nargs="?",
-        default="toggle",
-        choices=["toggle", "start", "stop", "status", "test"],
-        help="Action to perform (default: toggle)"
-    )
-    parser.add_argument(
-        "--config",
-        "-c",
-        type=Path,
-        default=None,
-        help="Path to custom config.json"
-    )
-
+    parser = argparse.ArgumentParser(
+        description="Velma push-to-talk dictation: hold the trigger key, speak, release.")
+    parser.add_argument("action", choices=["listen", "stop", "test"],
+                        help="listen: run the hotkey listener (normally via the systemd user "
+                             "service); stop: stop the service; test: check the endpoint")
+    parser.add_argument("--config", "-c", type=Path, default=None)
     args = parser.parse_args()
     cfg = DictateConfig.load(args.config)
 
-    if args.action == "status":
-        if is_running():
-            print("Status: RECORDING")
-            sys.exit(0)
-        else:
-            print("Status: STOPPED")
-            sys.exit(0)
+    if args.action == "listen":
+        from .ptt import run_listener
+        sys.exit(run_listener(cfg))
 
-    elif args.action == "stop":
-        if is_running():
-            stop_running_session()
-            print("Stopped dictation session.")
-        else:
-            print("No active dictation session.")
+    if args.action == "stop":
+        subprocess.run(["systemctl", "--user", "stop", "velma-dictate.service"])
+        subprocess.run(["pkill", "-f", "velma_dictate.cli listen"])
         sys.exit(0)
 
-    elif args.action == "start":
-        if is_running():
-            print("Dictation is already running.")
-            sys.exit(0)
-        daemon = DictationDaemon(cfg)
-        daemon.run()
-
-    elif args.action == "toggle":
-        if is_running():
-            stop_running_session()
-            print("Dictation toggled OFF.")
-        else:
-            daemon = DictationDaemon(cfg)
-            daemon.run()
-
-    elif args.action == "test":
-        print(f"Testing connection to endpoint: {cfg.endpoint_url}")
+    if args.action == "test":
+        print(f"Testing endpoint: {cfg.endpoint_url}")
         try:
             token = load_auth_token(cfg.token_path)
-            client = WhisperClient(cfg.endpoint_url, token, model=cfg.model)
-            ok = client.test_connection()
-            if ok:
-                print("✓ Connection successful: Whisper API endpoint is responsive.")
-                sys.exit(0)
-            else:
-                print("✗ Failed to verify responsiveness from Whisper API endpoint.", file=sys.stderr)
-                sys.exit(1)
+            ok = WhisperClient(cfg.endpoint_url, token, model=cfg.model).test_connection()
         except Exception as e:
-            print(f"✗ Test failed: {e}", file=sys.stderr)
+            print(f"Test failed: {e}", file=sys.stderr)
             sys.exit(1)
+        print("Endpoint OK" if ok else "Endpoint did not respond")
+        sys.exit(0 if ok else 1)
+
 
 if __name__ == "__main__":
     main()

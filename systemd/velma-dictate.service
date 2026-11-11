@@ -1,0 +1,15 @@
+[Unit]
+Description=Velma push-to-talk dictation (hold Right Ctrl, speak, release)
+After=graphical-session.target pipewire.service
+PartOf=graphical-session.target
+# Give up after repeated crashes instead of looping.
+StartLimitIntervalSec=120
+StartLimitBurst=3
+
+[Service]
+ExecStart=%h/.local/bin/velma-dictate listen
+Restart=on-failure
+RestartSec=5
+
+[Install]
+WantedBy=graphical-session.target
