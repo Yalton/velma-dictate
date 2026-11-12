@@ -23,11 +23,11 @@ install-daemon:
 compile-schemas:
 	glib-compile-schemas extension/schemas/
 
-install-extension: compile-schemas
-	mkdir -p $(EXT_DIR)
-	cp -r extension/* $(EXT_DIR)/
-	@echo "Extension files installed to $(EXT_DIR)"
-	@echo "Run 'make enable-extension' to enable it in GNOME Shell."
+install-extension: pack
+	gnome-extensions install --force $(EXTENSION_UUID).shell-extension.zip
+	rm -f $(EXTENSION_UUID).shell-extension.zip
+	@echo "Extension installed and registered with GNOME Shell."
+	@echo "Run 'make enable-extension' to activate it in the top bar."
 
 enable-extension:
 	gnome-extensions enable $(EXTENSION_UUID)
