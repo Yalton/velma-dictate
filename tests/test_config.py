@@ -4,7 +4,7 @@ import tempfile
 import pytest
 from pathlib import Path
 
-from velma_dictate.config import DictateConfig, load_auth_token
+from velma_dictate.config import DictateConfig, load_auth_token, save_auth_token
 
 def test_dictate_config_defaults():
     cfg = DictateConfig()
@@ -45,3 +45,33 @@ def test_load_auth_token_missing():
     fake_path = Path("/tmp/nonexistent-token-file-xyz")
     with pytest.raises(FileNotFoundError):
         load_auth_token(fake_path)
+
+
+def test_dictate_config_save_and_reload(tmp_path):
+    cfg_file = tmp_path / "config.json"
+    cfg = DictateConfig(
+        endpoint_url="https://api.example.com/v1/audio/transcriptions",
+        model="whisper-large-v3",
+        language="fr",
+        trigger_key="KEY_RIGHTALT",
+    )
+    cfg.save(cfg_file)
+
+    assert cfg_file.is_file()
+    assert oct(cfg_file.stat().st_mode & 0o777) == oct(0o600)
+
+    loaded = DictateConfig.load(cfg_file)
+    assert loaded.endpoint_url == "https://api.example.com/v1/audio/transcriptions"
+    assert loaded.model == "whisper-large-v3"
+    assert loaded.language == "fr"
+    assert loaded.trigger_key == "KEY_RIGHTALT"
+
+
+def test_save_auth_token(tmp_path):
+    token_file = tmp_path / "token"
+    save_auth_token("new-secret-key-123", token_file)
+
+    assert token_file.is_file()
+    assert oct(token_file.stat().st_mode & 0o777) == oct(0o600)
+    assert load_auth_token(token_file) == "new-secret-key-123"
+

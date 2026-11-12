@@ -43,6 +43,36 @@ class DictateConfig:
                     setattr(cfg, k, v)
         return cfg
 
+    def save(self, config_path: Optional[Path] = None) -> None:
+        path = config_path or DEFAULT_CONFIG_PATH
+        path.parent.mkdir(parents=True, exist_ok=True, mode=0o700)
+        data = {
+            "endpoint_url": self.endpoint_url,
+            "model": self.model,
+            "language": self.language,
+            "token_path": str(self.token_path),
+            "sample_rate": self.sample_rate,
+            "trigger_key": self.trigger_key,
+            "min_hold_seconds": self.min_hold_seconds,
+            "silence_seconds": self.silence_seconds,
+            "silence_threshold": self.silence_threshold,
+            "transcription_timeout_seconds": self.transcription_timeout_seconds,
+            "max_output_chars": self.max_output_chars,
+            "feedback_sound": self.feedback_sound,
+        }
+        with open(path, "w", encoding="utf-8") as f:
+            json.dump(data, f, indent=2)
+        os.chmod(path, 0o600)
+
+
+def save_auth_token(token: str, token_path: Optional[Path] = None) -> None:
+    path = token_path or DEFAULT_TOKEN_PATH
+    path = Path(os.path.expanduser(str(path)))
+    path.parent.mkdir(parents=True, exist_ok=True, mode=0o700)
+    with open(path, "w", encoding="utf-8") as f:
+        f.write(token.strip())
+    os.chmod(path, 0o600)
+
 
 def load_auth_token(token_path: Path) -> str:
     path = Path(os.path.expanduser(str(token_path)))

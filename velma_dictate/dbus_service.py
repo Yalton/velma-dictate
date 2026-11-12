@@ -46,6 +46,15 @@ class DictateDBusInterfaceBase:
     def IsEnabled(self) -> bool:
         raise NotImplementedError
 
+    def GetConfiguration(self) -> str:
+        raise NotImplementedError
+
+    def UpdateConfiguration(self, endpoint_url: str, model: str, language: str, trigger_key: str, token: str) -> bool:
+        raise NotImplementedError
+
+    def TestConnection(self) -> str:
+        raise NotImplementedError
+
 
 if HAS_DASBUS:
     @dbus_interface("org.velma.Dictate")
@@ -161,11 +170,54 @@ if HAS_DASBUS:
             with self._lock:
                 return self._enabled
 
+        def GetConfiguration(self) -> str:
+            with self._lock:
+                return json.dumps({
+                    "endpoint_url": self._endpoint_url,
+                    "model": self._model,
+                    "trigger_key": self._trigger_key,
+                })
+
+        def UpdateConfiguration(self, endpoint_url: str, model: str, language: str, trigger_key: str, token: str) -> bool:
+            with self._lock:
+                self._endpoint_url = endpoint_url
+                self._model = model
+                self._trigger_key = trigger_key
+            try:
+                from .config import DictateConfig, save_auth_token
+                cfg = DictateConfig.load()
+                cfg.endpoint_url = endpoint_url
+                cfg.model = model
+                cfg.language = language
+                cfg.trigger_key = trigger_key
+                cfg.save()
+                if token:
+                    save_auth_token(token)
+                return True
+            except Exception as e:
+                logger.error(f"Failed to update configuration: {e}")
+                return False
+
+        def TestConnection(self) -> str:
+            try:
+                from .client import WhisperClient
+                from .config import DictateConfig, load_auth_token
+                cfg = DictateConfig.load()
+                token = load_auth_token(cfg.token_path)
+                client = WhisperClient(cfg.endpoint_url, token, model=cfg.model)
+                ok = client.test_connection()
+                return json.dumps({"ok": ok, "message": "Endpoint OK" if ok else "Endpoint did not respond"})
+            except Exception as e:
+                return json.dumps({"ok": False, "message": str(e)})
+
 
 class DummyDBusService:
     """Fallback no-op service when D-Bus or dasbus is unavailable."""
 
     def __init__(self, endpoint_url: str = "", model: str = "", trigger_key: str = ""):
+        self.endpoint_url = endpoint_url
+        self.model = model
+        self.trigger_key = trigger_key
         self._enabled = True
         self._state = "idle"
 
@@ -199,6 +251,31 @@ class DummyDBusService:
 
     def IsEnabled(self) -> bool:
         return self._enabled
+
+    def GetConfiguration(self) -> str:
+        return json.dumps({
+            "endpoint_url": self.endpoint_url,
+            "model": self.model,
+            "trigger_key": self.trigger_key,
+        })
+
+    def UpdateConfiguration(self, endpoint_url: str, model: str, language: str, trigger_key: str, token: str) -> bool:
+        try:
+            from .config import DictateConfig, save_auth_token
+            cfg = DictateConfig.load()
+            cfg.endpoint_url = endpoint_url
+            cfg.model = model
+            cfg.language = language
+            cfg.trigger_key = trigger_key
+            cfg.save()
+            if token:
+                save_auth_token(token)
+            return True
+        except Exception:
+            return False
+
+    def TestConnection(self) -> str:
+        return json.dumps({"ok": False, "message": "Daemon not running"})
 
 
 class DBusPublisher:
