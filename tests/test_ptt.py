@@ -19,6 +19,7 @@ class FakeRecorder:
         self.recording = False
         self.starts = 0
         self.seconds = 1.0
+        self.silent_seconds = 0.0
 
     def start(self):
         self.recording = True
@@ -42,7 +43,7 @@ def make(seconds=1.0):
     rec.seconds = seconds
     clips = []
     busy, cancel, clock = threading.Event(), threading.Event(), Clock()
-    p = PushToTalk(TRIGGER, rec, clips.append, 0.35, 30.0, RATE, cancel, busy, clock=clock)
+    p = PushToTalk(TRIGGER, rec, clips.append, 0.35, 15.0, RATE, cancel, busy, clock=clock)
     return p, rec, clips, busy, cancel, clock
 
 
@@ -81,10 +82,13 @@ def test_shortcut_chord_cancels_clip():
     assert clips == [] and not rec.recording
 
 
-def test_cap_stops_recording_but_types_only_after_release():
+def test_silence_stops_recording_but_types_only_after_release():
     p, rec, clips, busy, cancel, clock = make()
     p.on_key(TRIGGER, PRESS)
-    clock.t = 31.0
+    clock.t = 120.0
+    p.tick()
+    assert rec.recording
+    rec.silent_seconds = 15.0
     p.tick()
     assert not rec.recording
     assert clips == []  # trigger still held: must not type yet

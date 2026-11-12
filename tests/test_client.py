@@ -72,3 +72,24 @@ def test_connection_test(fake_server):
     endpoint = f"{fake_server}/v1/audio/transcriptions"
     client = WhisperClient(endpoint_url=endpoint, token="test-secret-token")
     assert client.test_connection() is True
+
+
+def test_waits_past_old_timeout_for_cold_load():
+    import time
+
+    class ColdHandler(FakeWhisperHandler):
+        def do_POST(self):
+            time.sleep(8.2)
+            super().do_POST()
+
+    server = HTTPServer(('127.0.0.1', 0), ColdHandler)
+    thread = threading.Thread(target=server.serve_forever, daemon=True)
+    thread.start()
+    try:
+        client = WhisperClient(
+            f'http://127.0.0.1:{server.server_port}/v1/audio/transcriptions',
+            'test-secret-token')
+        assert client.transcribe(b'RIFF test') == 'Hello world from test server.'
+    finally:
+        server.shutdown()
+        server.server_close()

@@ -9,7 +9,7 @@ class WhisperClient:
         token: str,
         model: str = "parakeet",
         language: str = "",
-        timeout_seconds: float = 8.0
+        timeout_seconds: Optional[float] = None
     ):
         self.endpoint_url = endpoint_url
         self.token = token
@@ -40,7 +40,7 @@ class WhisperClient:
             headers=headers,
             files=files,
             data=data,
-            timeout=self.timeout
+            timeout=(10.0, self.timeout)
         )
 
         if resp.status_code != 200:

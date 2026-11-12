@@ -21,10 +21,12 @@ class DictateConfig:
     trigger_key: str = "KEY_RIGHTCTRL"
     # Clips shorter than this are treated as an accidental tap and dropped.
     min_hold_seconds: float = 0.35
-    # Recording stops by itself after this long, even if the key is still held.
-    max_hold_seconds: float = 30.0
+    silence_seconds: float = 15.0
+    # RMS level in signed 16-bit PCM units.
+    silence_threshold: float = 300.0
+    transcription_timeout_seconds: Optional[float] = None
     # Upper bound on characters typed from one clip.
-    max_output_chars: int = 2000
+    max_output_chars: Optional[int] = None
     feedback_sound: bool = True
 
     @classmethod

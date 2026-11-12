@@ -56,7 +56,7 @@ class PushToTalk:
         recorder,
         handle_clip: Callable[[bytes], None],
         min_hold_seconds: float,
-        max_hold_seconds: float,
+        silence_seconds: float,
         sample_rate: int,
         cancel_typing: threading.Event,
         busy: threading.Event,
@@ -67,7 +67,7 @@ class PushToTalk:
         self.recorder = recorder
         self.handle_clip = handle_clip
         self.min_bytes = int(sample_rate * 2 * min_hold_seconds)
-        self.max_hold_seconds = max_hold_seconds
+        self.silence_seconds = silence_seconds
         self.cancel_typing = cancel_typing
         self.busy = busy
         self.clock = clock
@@ -97,9 +97,9 @@ class PushToTalk:
                 self._abort()
 
     def tick(self) -> None:
-        """Called periodically; enforces the hard recording cap."""
+        """Stop after sustained silence; defer typing until key release."""
         if (self.pressed_at is not None and not self.aborted and self.capped is None
-                and self.clock() - self.pressed_at >= self.max_hold_seconds):
+                and self.recorder.silent_seconds >= self.silence_seconds):
             # Stop recording now, but type only after release: typing while
             # the trigger (a modifier) is held would fire shortcuts.
             self.capped = self.recorder.stop()
@@ -168,9 +168,10 @@ def run_listener(cfg: DictateConfig) -> int:
         return 2
 
     token = load_auth_token(cfg.token_path)
-    client = WhisperClient(cfg.endpoint_url, token, model=cfg.model, language=cfg.language)
+    client = WhisperClient(cfg.endpoint_url, token, model=cfg.model, language=cfg.language,
+                           timeout_seconds=cfg.transcription_timeout_seconds)
     typer = WaylandTyper()
-    recorder = HoldRecorder(cfg.sample_rate, cfg.max_hold_seconds)
+    recorder = HoldRecorder(cfg.sample_rate, cfg.silence_threshold)
     busy = threading.Event()
     cancel_typing = threading.Event()
 
@@ -192,7 +193,7 @@ def run_listener(cfg: DictateConfig) -> int:
 
     cues = {"start": cue_start, "stop": cue_stop, "busy": cue_busy} if cfg.feedback_sound else {}
     ptt = PushToTalk(trigger_code, recorder, handle_clip, cfg.min_hold_seconds,
-                     cfg.max_hold_seconds, cfg.sample_rate, cancel_typing, busy, cues=cues)
+                     cfg.silence_seconds, cfg.sample_rate, cancel_typing, busy, cues=cues)
 
     sel = selectors.DefaultSelector()
     devices: Dict[str, evdev.InputDevice] = {}

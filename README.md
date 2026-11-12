@@ -8,7 +8,7 @@ once into the focused window. Nothing listens unless the key is held.
 
 - Right Ctrl used as a shortcut (Right Ctrl+C, etc.) cancels the clip.
 - Esc while text is being typed stops the typing.
-- Recording stops at 30 s; the text is typed when you release the key.
+- Recording has no duration cap and stops after 15 seconds of silence; the text is typed when you release the key.
 - A press while the previous clip is still being typed plays a warning sound and is ignored.
 - Only one listener can run (lock at `/run/user/$UID/velma-dictate.lock`).
 
@@ -31,10 +31,14 @@ named `velma-dictate-keyboard`, which the listener ignores.
 ## Config
 
 `~/.config/velma-dictate/config.json` (mode 0600): `trigger_key` (evdev name,
-default `KEY_RIGHTCTRL`), `min_hold_seconds`, `max_hold_seconds`,
-`max_output_chars`, `feedback_sound`, `endpoint_url`, `model`, `language`.
+default `KEY_RIGHTCTRL`), `min_hold_seconds`, `silence_seconds` (default 15), `silence_threshold` (16-bit RMS, default 300),
+`transcription_timeout_seconds` (default null: wait for model loading and transcription),
+`max_output_chars` (default null: unlimited), `feedback_sound`, `endpoint_url`, `model`, `language`.
 Bearer token: `~/.config/velma-dictate/token` (mode 0600).
 
 ## Tests
 
     python3 -m pytest -q tests
+
+Legacy `max_hold_seconds` settings are ignored. The HTTP connection timeout is
+10 seconds; the response wait is unlimited by default so cold model loads can finish.
