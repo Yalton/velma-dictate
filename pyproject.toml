@@ -17,3 +17,6 @@ dependencies = [
 
 [project.scripts]
 velma-dictate = "velma_dictate.cli:main"
+
+[tool.setuptools.packages.find]
+include = ["velma_dictate*"]

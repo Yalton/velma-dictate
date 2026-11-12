@@ -13,3 +13,4 @@ venv/
 *.log
 *.zip
 schemas/gschemas.compiled
+*.egg-info/
