@@ -11,3 +11,5 @@ venv/
 *.token
 *token*
 *.log
+*.zip
+schemas/gschemas.compiled

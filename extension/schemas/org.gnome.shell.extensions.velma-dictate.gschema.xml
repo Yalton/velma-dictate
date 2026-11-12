@@ -1,0 +1,20 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<schemalist>
+  <schema id="org.gnome.shell.extensions.velma-dictate" path="/org/gnome/shell/extensions/velma-dictate/">
+    <key name="show-panel-text" type="b">
+      <default>false</default>
+      <summary>Show status text in top bar</summary>
+      <description>Show live latency and state badge directly in the GNOME top bar next to the icon.</description>
+    </key>
+    <key name="auto-copy" type="b">
+      <default>false</default>
+      <summary>Auto-copy transcription to clipboard</summary>
+      <description>Automatically copy new transcriptions to clipboard in addition to typing.</description>
+    </key>
+    <key name="history-size" type="i">
+      <default>15</default>
+      <summary>History log display limit</summary>
+      <description>Maximum number of recent transcriptions displayed in the popover menu.</description>
+    </key>
+  </schema>
+</schemalist>

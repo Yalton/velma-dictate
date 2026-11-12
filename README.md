@@ -36,6 +36,31 @@ default `KEY_RIGHTCTRL`), `min_hold_seconds`, `silence_seconds` (default 15), `s
 `max_output_chars` (default null: unlimited), `feedback_sound`, `endpoint_url`, `model`, `language`.
 Bearer token: `~/.config/velma-dictate/token` (mode 0600).
 
+## GNOME Shell Extension (Optional)
+
+A companion GNOME Shell extension (`extension/`) is included. It connects to the daemon over D-Bus (`org.velma.Dictate`) and provides:
+
+- **Top Bar Indicator:** Real-time state icon (idle, recording in red, transcribing in blue, typing in green).
+- **Latency & Performance:** Shows audio duration, API latency (ms), and real-time multiplier in the dropdown menu (or directly in the top bar).
+- **Recent History & Clipboard:** Browse recent dictations; click any entry to copy it directly to your clipboard.
+- **Toggle Control:** Mute/pause dictation without stopping the service.
+
+### Installing the Extension
+
+```bash
+make install-extension
+make enable-extension
+```
+
+To build a standalone zip bundle for the [GNOME Extensions Marketplace](https://extensions.gnome.org):
+
+```bash
+make pack
+# Generates velma-dictate@billbert.co.shell-extension.zip
+```
+
+The extension is strictly optional. If the extension is not installed or GNOME Shell is not running, the daemon runs headlessly as before.
+
 ## Tests
 
     python3 -m pytest -q tests

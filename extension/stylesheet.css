@@ -1,0 +1,78 @@
+/* Velma Dictate GNOME Extension Styles */
+
+.velma-indicator-box {
+    spacing: 4px;
+}
+
+.velma-indicator-label {
+    font-size: 11px;
+    font-weight: bold;
+    padding-left: 2px;
+}
+
+/* Status colors for the top-bar icon */
+.velma-status-idle {
+    color: inherit;
+    opacity: 0.85;
+}
+
+.velma-status-recording {
+    color: #e01b24 !important; /* GNOME Red */
+}
+
+.velma-status-transcribing {
+    color: #3584e4 !important; /* GNOME Blue */
+}
+
+.velma-status-typing {
+    color: #33d17a !important; /* GNOME Green */
+}
+
+.velma-status-offline {
+    color: #77767b !important;
+    opacity: 0.45;
+}
+
+/* Popover Content Styling */
+.velma-card {
+    background-color: rgba(255, 255, 255, 0.06);
+    border-radius: 8px;
+    padding: 10px 12px;
+    margin: 4px 8px;
+}
+
+.velma-card-header {
+    font-weight: bold;
+    font-size: 13px;
+    margin-bottom: 4px;
+}
+
+.velma-card-body {
+    font-size: 12px;
+    line-height: 1.3;
+}
+
+.velma-stats-row {
+    font-size: 11px;
+    opacity: 0.75;
+    margin-top: 4px;
+}
+
+.velma-history-item {
+    padding: 6px 8px;
+    border-radius: 6px;
+    margin: 2px 4px;
+}
+
+.velma-history-item:hover {
+    background-color: rgba(255, 255, 255, 0.08);
+}
+
+.velma-history-text {
+    font-size: 12px;
+}
+
+.velma-history-meta {
+    font-size: 10px;
+    opacity: 0.65;
+}

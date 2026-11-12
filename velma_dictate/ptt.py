@@ -18,7 +18,7 @@ import selectors
 import sys
 import threading
 import time
-from typing import Callable, Dict, Optional
+from typing import Any, Callable, Dict, Optional
 
 import evdev
 from evdev import ecodes
@@ -26,6 +26,7 @@ from evdev import ecodes
 from .audio import pcm_to_wav_bytes
 from .client import WhisperClient
 from .config import DictateConfig, load_auth_token
+from .dbus_service import DBusPublisher
 from .feedback import cue_busy, cue_start, cue_stop
 from .recorder import HoldRecorder
 from .typer import VIRTUAL_KEYBOARD_NAME, WaylandTyper
@@ -62,6 +63,7 @@ class PushToTalk:
         busy: threading.Event,
         clock: Callable[[], float] = time.monotonic,
         cues: Optional[Dict[str, Callable[[], None]]] = None,
+        dbus_service: Optional[Any] = None,
     ):
         self.trigger_code = trigger_code
         self.recorder = recorder
@@ -72,6 +74,7 @@ class PushToTalk:
         self.busy = busy
         self.clock = clock
         self.cues = cues or {}
+        self.dbus_service = dbus_service
         self.pressed_at: Optional[float] = None
         self.aborted = False
         self.capped: Optional[bytes] = None
@@ -106,6 +109,8 @@ class PushToTalk:
             self._cue("stop")
 
     def _press(self) -> None:
+        if self.dbus_service is not None and not self.dbus_service.IsEnabled():
+            return
         if self.pressed_at is not None:
             return
         if self.busy.is_set():
@@ -114,6 +119,8 @@ class PushToTalk:
         self.pressed_at = self.clock()
         self.aborted = False
         self.recorder.start()
+        if self.dbus_service is not None:
+            self.dbus_service.notify_state("recording")
         self._cue("start")
 
     def _release(self) -> None:
@@ -132,12 +139,18 @@ class PushToTalk:
     def _abort(self) -> None:
         self.recorder.stop()
         self.aborted = True
+        if self.dbus_service is not None:
+            self.dbus_service.notify_state("idle")
 
     def _submit(self, pcm: bytes) -> None:
         if len(pcm) < self.min_bytes:
+            if self.dbus_service is not None:
+                self.dbus_service.notify_state("idle")
             return
         self.busy.set()
         self.cancel_typing.clear()
+        if self.dbus_service is not None:
+            self.dbus_service.notify_state("transcribing")
         self.handle_clip(pcm)
 
 
@@ -175,25 +188,43 @@ def run_listener(cfg: DictateConfig) -> int:
     busy = threading.Event()
     cancel_typing = threading.Event()
 
+    dbus_pub = DBusPublisher(cfg.endpoint_url, cfg.model, cfg.trigger_key)
+    dbus_service = dbus_pub.start()
+
     def worker(pcm: bytes) -> None:
+        t0 = time.monotonic()
+        duration = len(pcm) / (cfg.sample_rate * 2)
         try:
+            if dbus_service is not None:
+                dbus_service.notify_state("transcribing")
             text = client.transcribe(pcm_to_wav_bytes(pcm, cfg.sample_rate))
+            latency_ms = (time.monotonic() - t0) * 1000
             text = " ".join(text.split())[: cfg.max_output_chars]
             if text and not cancel_typing.is_set():
+                if dbus_service is not None:
+                    dbus_service.notify_state("typing")
                 typer.type_text(text, cancel=cancel_typing)
+            if dbus_service is not None:
+                dbus_service.notify_transcription_completed(text, duration, latency_ms)
         except Exception as e:  # network, server or typing failure: report, never retry
+            latency_ms = (time.monotonic() - t0) * 1000
             print(f"Transcription failed: {e}", file=sys.stderr)
             if cfg.feedback_sound:
                 cue_busy()
+            if dbus_service is not None:
+                dbus_service.notify_error(str(e), duration, latency_ms)
         finally:
             busy.clear()
+            if dbus_service is not None:
+                dbus_service.notify_state("idle")
 
     def handle_clip(pcm: bytes) -> None:
         threading.Thread(target=worker, args=(pcm,), daemon=True).start()
 
     cues = {"start": cue_start, "stop": cue_stop, "busy": cue_busy} if cfg.feedback_sound else {}
     ptt = PushToTalk(trigger_code, recorder, handle_clip, cfg.min_hold_seconds,
-                     cfg.silence_seconds, cfg.sample_rate, cancel_typing, busy, cues=cues)
+                     cfg.silence_seconds, cfg.sample_rate, cancel_typing, busy, cues=cues,
+                     dbus_service=dbus_service)
 
     sel = selectors.DefaultSelector()
     devices: Dict[str, evdev.InputDevice] = {}
@@ -227,5 +258,6 @@ def run_listener(cfg: DictateConfig) -> int:
     except KeyboardInterrupt:
         return 0
     finally:
+        dbus_pub.stop()
         recorder.stop()
         typer.close()

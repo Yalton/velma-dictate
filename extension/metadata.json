@@ -1,0 +1,17 @@
+{
+  "name": "Velma Dictate",
+  "description": "System-wide push-to-talk dictation indicator, latency tracker, and transcription log for Velma Dictate.",
+  "uuid": "velma-dictate@billbert.co",
+  "shell-version": [
+    "45",
+    "46",
+    "47",
+    "48",
+    "49",
+    "50",
+    "51"
+  ],
+  "settings-schema": "org.gnome.shell.extensions.velma-dictate",
+  "url": "https://repo.billbert.co/yalt/velma-dictate",
+  "version": 1
+}
