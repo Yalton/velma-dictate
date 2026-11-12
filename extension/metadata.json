@@ -12,6 +12,6 @@
     "51"
   ],
   "settings-schema": "org.gnome.shell.extensions.velma-dictate",
-  "url": "https://repo.billbert.co/yalt/velma-dictate",
+  "url": "https://github.com/Yalton/velma-dictate",
   "version": 1
 }
