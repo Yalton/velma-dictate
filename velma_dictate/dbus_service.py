@@ -9,7 +9,7 @@ import logging
 import threading
 import time
 from collections import deque
-from typing import Any, Dict, List, Optional
+from typing import Any, Dict, Optional
 
 logger = logging.getLogger("velma_dictate.dbus")
 
