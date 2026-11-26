@@ -1,6 +1,6 @@
 {
   "types": [],
-  "verify_command": "pytest -q",
+  "verify_command": "PYTHONPATH=src python3 -m pytest -q",
   "git_authority": {
     "commit": "agent",
     "push_branch": "agent",
